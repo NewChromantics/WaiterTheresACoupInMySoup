@@ -5,12 +5,37 @@ import AssetManager from './PopEngine/AssetManager.js'
 import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
 
 
-const ClearColour = [0.2,0.1,0.4];
-const MapCellColour = [0.8,0.2,0.3];
+const ClearColour = [0,0,0];
+
+//	Table
+//	Statue
+//	Wall
+//	Chair
+const MapCellColours = {};
+MapCellColours['_']	= [214, 210, 203].map( x=>x/255 );
+MapCellColours.T	= [161, 113, 35].map( x=>x/255 );
+MapCellColours.C	= [92, 70, 33].map( x=>x/255 );
+MapCellColours.W	= [204, 90, 49].map( x=>x/255 );
+MapCellColours.S	= [255, 179, 0].map( x=>x/255 );
+const PremadeMap = 
+[
+"W____C_C_C_C_C___W",
+"W___TTTTTTTTTTT__W",
+"W___TTTTTTTTTTT__W",
+"W____C_C_C_C_C___W",
+"W________________W",
+"WWWWWWW____WWWWWWW",
+"W_______________SW",
+"W_______________SW",
+"W________________W",
+"W________________W",
+"W________________W",
+];
+
 
 async function CreateActorTriangleBuffer(RenderContext)
 {
-	const Geometry = CreateCubeGeometry( 0.1, 0.9, 0.0, 0.1 );
+	const Geometry = CreateCubeGeometry( 0.1, 0.9, 0.0, 0.9 );
 	const TriangleIndexes = undefined;
 	const TriBuffer = await RenderContext.CreateGeometry(Geometry,TriangleIndexes);
 	return TriBuffer;
@@ -98,7 +123,7 @@ class Renderer_Spy
 		return [x,y,z];
 	}
 	
-	GetCubeRenderCommand(PushCommand,RenderContext,Coord,CameraUniforms,Colour)
+	GetCubeRenderCommand(PushCommand,RenderContext,Coord,CameraUniforms,GeoAsset,Colour)
 	{
 		const Uniforms = Object.assign( {}, CameraUniforms );
 		
@@ -108,7 +133,7 @@ class Renderer_Spy
 		Uniforms.Colour = Colour;
 		Uniforms.LocalToWorldTransform = CreateTranslationMatrix( ...Position );
 		
-		const Geo = AssetManager.GetAsset(this.MapFloorTileGeo,RenderContext);
+		const Geo = AssetManager.GetAsset(GeoAsset,RenderContext);
 		const Shader = AssetManager.GetAsset(this.MapCubeShader,RenderContext);
 		
 		PushCommand('Draw',Geo,Shader,Uniforms);
@@ -131,7 +156,11 @@ class Renderer_Spy
 		//	render laser pointer
 		for ( let Coord in this.Game.Map.Cells )
 		{
-			this.GetCubeRenderCommand( PushCommand, RenderContext, Coord, CameraUniforms, MapCellColour );
+			const Cell = this.Game.Map.Cells[Coord];
+			const Colour = MapCellColours[Cell.Type];
+			const IsFloor = (Cell.Type=='_');
+			const GeoAsset = IsFloor ? this.MapFloorTileGeo : this.ActorCubeGeo;
+			this.GetCubeRenderCommand( PushCommand, RenderContext, Coord, CameraUniforms, GeoAsset, Colour);
 		}
 	}
 	
@@ -187,7 +216,13 @@ class MapState_t
 {
 	constructor(Width,Height)
 	{
-		this.Cells = GenerateCellMap( ()=>{}, Width, Height );
+		function CreateCell(x,y)
+		{
+			const Cell = {};
+			Cell.Type = PremadeMap[y][x];
+			return Cell;
+		}
+		this.Cells = GenerateCellMap( CreateCell, PremadeMap[0].length, PremadeMap.length );
 	}
 	
 	
