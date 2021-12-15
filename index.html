@@ -1,0 +1,25 @@
+<html>
+<head>
+<style>
+html,
+body
+{
+	background: 	#333;
+	margin:		0px;
+	padding:	0px;
+	color:		#eed;
+}
+</style>
+</head>
+<body>
+<canvas></canvas>
+
+<script type=module>
+import Bootup from './Client/Jaccuse.js'
+const Canvas = document.querySelector(`canvas`);
+Bootup(Canvas).catch(console.error);
+</script>
+
+</body>
+</html>
+
