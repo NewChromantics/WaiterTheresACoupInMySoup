@@ -1,49 +1,61 @@
 import Pop from './PopEngine/PopEngine.js'
 import Camera_t from './PopEngine/Camera.js'
-import {Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationMatrix} from './PopEngine/Math.js'
+import {Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationMatrix,CreateTranslationScaleMatrix} from './PopEngine/Math.js'
 import AssetManager from './PopEngine/AssetManager.js'
 import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
 
 
 const ClearColour = [0,0,0];
 
-//	Table
-//	Statue
-//	Wall
-//	Chair
-const MapCellColours = {};
-MapCellColours['_']	= [214, 210, 203].map( x=>x/255 );
-MapCellColours.T	= [161, 113, 35].map( x=>x/255 );
-MapCellColours.C	= [92, 70, 33].map( x=>x/255 );
-MapCellColours.W	= [204, 90, 49].map( x=>x/255 );
-MapCellColours.S	= [255, 179, 0].map( x=>x/255 );
+function CellAttribs(Red,Green,Blue,Height)
+{
+	const Attribs = {};
+	Attribs.Colour = [Red,Green,Blue].map( x=>x/255 );
+	Attribs.Height = Height;
+	return Attribs;
+}
+
+const MapWall = 'W';
+const MapWoodFloor = '_';
+const MapKitchenFloor = '.';
+const MapTable = 'T';
+const MapTablePlacecard = 'P';
+const MapPlayer = 'X';
+const MapKing = 'K';
+
+const FloorHeight = 0.1;
+const TableHeight = 0.8;
+const PersonHeight = 1.5;
+const WallHeight = 2.4;
+const MapCellAttributes = {};
+MapCellAttributes[MapWoodFloor]		= CellAttribs( 141, 93, 15, FloorHeight );
+MapCellAttributes[MapKitchenFloor]	= CellAttribs( 214, 210, 203, FloorHeight );
+MapCellAttributes[MapTable]			= CellAttribs( 161, 113, 35, TableHeight );
+MapCellAttributes[MapTablePlacecard]	= CellAttribs( 250, 250, 250, TableHeight+0.1 );
+MapCellAttributes[MapWall]			= CellAttribs( 204, 90, 49, WallHeight );
+MapCellAttributes[MapPlayer]		= CellAttribs( 245, 232, 118, PersonHeight );
+MapCellAttributes[MapKing]			= CellAttribs( 255, 180, 18, PersonHeight );
 const PremadeMap = 
 [
-"W____C_C_C_C_C___W",
-"W___TTTTTTTTTTT__W",
-"W___TTTTTTTTTTT__W",
-"W____C_C_C_C_C___W",
-"W________________W",
-"WWWWWWW____WWWWWWW",
-"W_______________SW",
-"W_______________SW",
-"W________________W",
-"W________________W",
-"W________________W",
+"____________W_____________________________W             ",
+"____________W_____________________________W             ",
+"__________________________________________W             ",
+"__________________________________________W             ",
+"____________W______X_X_X_X_K_X_X_X_X______W             ",
+"____________W_____TTTTTTTTTTTTTTTTTTT_____W             ",
+"____________W_____TTTTTTTTTTTTTTTTTTT_____W.............",
+"____________W_____TPTPTPTPTTTPTPTPTPT_____W.............",
+"____________W_____TTTTTTTTTTTTTTTTTTT_____W.............",
+"            W_____________________________W.............",
+"            W______________________________.............",
+"            W______________________________.............",
+"            W_____________________________W.............",
 ];
 
 
-async function CreateActorTriangleBuffer(RenderContext)
+async function CreateCube01TriangleBuffer(RenderContext)
 {
-	const Geometry = CreateCubeGeometry( 0.1, 0.9, 0.0, 0.9 );
-	const TriangleIndexes = undefined;
-	const TriBuffer = await RenderContext.CreateGeometry(Geometry,TriangleIndexes);
-	return TriBuffer;
-}
-
-async function CreateFloorTileTriangleBuffer(RenderContext)
-{
-	const Geometry = CreateCubeGeometry( 0.1, 0.9, 0.0, 0.1 );
+	const Geometry = CreateCubeGeometry( 0.0, 1.0 );
 	const TriangleIndexes = undefined;
 	const TriBuffer = await RenderContext.CreateGeometry(Geometry,TriangleIndexes);
 	return TriBuffer;
@@ -61,8 +73,7 @@ class Renderer_Spy
 		this.Camera = this.CreateCamera(Game,RenderView);
 
 		const MapCubeGeoAttribs = ['LocalPosition','LocalUv'];	//	need to remove the need for this!
-		this.ActorCubeGeo = AssetManager.RegisterAssetAsyncFetchFunction('ActorCube', CreateActorTriangleBuffer);
-		this.MapFloorTileGeo = AssetManager.RegisterAssetAsyncFetchFunction('MapFloorTile', CreateFloorTileTriangleBuffer);
+		this.CubeGeo = AssetManager.RegisterAssetAsyncFetchFunction('Cube01', CreateCube01TriangleBuffer);
 		this.MapCubeShader = AssetManager.RegisterShaderAssetFilename(MapCubeFrag_Filename,MapCubeVert_Filename,null,MapCubeGeoAttribs);
 	}
 	
@@ -77,9 +88,9 @@ class Renderer_Spy
 		MapMinMax.Max = this.MapPositionToWorldPosition( MapMinMax.Max );
 		Camera.LookAt = Lerp3( MapMinMax.Min, MapMinMax.Max, 0.5 );
 		
-		const Pitch = -50;
+		const Pitch = -70;
 		const Yaw = 0;	//	isometric starting view
-		const Zoom = 0.6 * Distance3( MapMinMax.Min, MapMinMax.Max );
+		const Zoom = 0.5 * Distance3( MapMinMax.Min, MapMinMax.Max );
 		Camera.SetOrbit( Pitch, Yaw, 0, Zoom );
 		
 		//	bind camera controls
@@ -118,25 +129,36 @@ class Renderer_Spy
 	{
 		//	1 unit = 1 metre for now
 		const y = 0;
-		const x = xy[0];
+		//	gr: cant quite figure out if the camera is upside down... or we're rendering weirdly
+		//		but left->right is backwards
+		const x = -xy[0];
 		const z = xy[1];
 		return [x,y,z];
 	}
 	
-	GetCubeRenderCommand(PushCommand,RenderContext,Coord,CameraUniforms,GeoAsset,Colour)
+	GetCubeRenderCommand(PushCommand,RenderContext,Position,CameraUniforms,GeoAsset,Colour,Scale3=[1,1,1])
 	{
 		const Uniforms = Object.assign( {}, CameraUniforms );
 		
-		const Coordxy = CoordToXy( Coord );
-		const Position = this.MapPositionToWorldPosition( Coordxy );
-		
 		Uniforms.Colour = Colour;
-		Uniforms.LocalToWorldTransform = CreateTranslationMatrix( ...Position );
+		Uniforms.LocalToWorldTransform = CreateTranslationScaleMatrix( Position, Scale3 );
 		
 		const Geo = AssetManager.GetAsset(GeoAsset,RenderContext);
 		const Shader = AssetManager.GetAsset(this.MapCubeShader,RenderContext);
 		
 		PushCommand('Draw',Geo,Shader,Uniforms);
+	}
+
+	GetCellRenderCommands(Cell,Coord,CameraUniforms,PushCommand,RenderContext)
+	{
+		const Colour = Cell.Colour;
+		const ScaleY = Cell.Height;
+		const GeoAsset = this.CubeGeo;
+				
+		const Coordxy = CoordToXy( Coord );
+		const Position = this.MapPositionToWorldPosition( Coordxy );
+
+		this.GetCubeRenderCommand( PushCommand, RenderContext, Position, CameraUniforms, GeoAsset, Colour, [1,ScaleY,1] );
 	}
 
 	GetSceneRenderCommands(PushCommand,RenderContext)
@@ -157,10 +179,9 @@ class Renderer_Spy
 		for ( let Coord in this.Game.Map.Cells )
 		{
 			const Cell = this.Game.Map.Cells[Coord];
-			const Colour = MapCellColours[Cell.Type];
-			const IsFloor = (Cell.Type=='_');
-			const GeoAsset = IsFloor ? this.MapFloorTileGeo : this.ActorCubeGeo;
-			this.GetCubeRenderCommand( PushCommand, RenderContext, Coord, CameraUniforms, GeoAsset, Colour);
+			if ( !Cell )
+				continue;
+			this.GetCellRenderCommands( Cell, Coord, CameraUniforms, PushCommand, RenderContext );
 		}
 	}
 	
@@ -214,12 +235,16 @@ function CoordToXy(Coord)
 //		maybe this can be the state, so use dumb data
 class MapState_t
 {
-	constructor(Width,Height)
+	constructor(PremadeMap)
 	{
 		function CreateCell(x,y)
 		{
 			const Cell = {};
 			Cell.Type = PremadeMap[y][x];
+			const Attribs = MapCellAttributes[Cell.Type];
+			if ( !Attribs )
+				return null;
+			Object.assign( Cell, MapCellAttributes[Cell.Type] );
 			return Cell;
 		}
 		this.Cells = GenerateCellMap( CreateCell, PremadeMap[0].length, PremadeMap.length );
@@ -258,7 +283,7 @@ export default class JaccuseGame
 	constructor(RenderView,RenderContext)
 	{
 		//	setup state
-		this.Map = new MapState_t( 20, 20 );
+		this.Map = new MapState_t( PremadeMap );
 
 		//	setup renderer
 		this.Renderer = new Renderer_Spy( this, RenderView );
@@ -291,7 +316,7 @@ export default class JaccuseGame
 			catch(e)
 			{
 				console.error(e);
-				await Pop.Yield(2);
+				await Pop.Yield(200);
 			}
 		}
 	}
