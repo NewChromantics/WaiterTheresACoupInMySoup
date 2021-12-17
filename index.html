@@ -1,5 +1,6 @@
 <html>
 <head>
+<script src='Client/DebugActionDialogElement.js' type=module></script>
 <style>
 html,
 body
@@ -17,9 +18,24 @@ body *
 {
 	flex: 1;
 }
+
+debug-action-choices
+{
+	xvisibility:	hidden;
+	position:	absolute;
+	xtop:		10vh;
+	bottom:		10vh;
+	left:		10vw;
+	right:		10vw;
+	background:	#333;
+	border:		#eed 1px solid;
+	color:		#eed;
+}
+
 </style>
 </head>
 <body>
+<debug-action-choices actions="" id="MoveDialog"></debug-action-choices>
 <canvas></canvas>
 
 <script type=module>

@@ -3,6 +3,7 @@ import {Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationM
 import AssetManager from './PopEngine/AssetManager.js'
 import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
 import {CoordToXy} from './Map.js'
+import {CreatePromise} from './PopEngine/PopWebApiCore.js'
 
 const ClearColour = [0,0,0];
 
@@ -31,6 +32,30 @@ export default class Renderer
 		this.CubeGeo = AssetManager.RegisterAssetAsyncFetchFunction('Cube01', CreateCube01TriangleBuffer);
 		this.MapCubeShader = AssetManager.RegisterShaderAssetFilename(MapCubeFrag_Filename,MapCubeVert_Filename,null,MapCubeGeoAttribs);
 	}
+	
+	async WaitForMoveSelection(Actions)
+	{
+		const MoveDialog = document.querySelector(`#MoveDialog`);
+		if ( !MoveDialog )
+			throw `Missing temp #MoveDialog element`;
+		
+		const ActionsJson = JSON.stringify(Actions);
+		MoveDialog.setAttribute('actions',ActionsJson);
+		
+		const OnActionPromise = CreatePromise();
+		MoveDialog.onselection = OnActionPromise.Resolve;
+		
+		MoveDialog.style.visibility = 'visible';
+		const Action = await OnActionPromise;
+		MoveDialog.style.visibility = 'hidden';
+		
+		const Reply = {};
+		Reply.Action = Action[0];
+		Reply.ActionArguments = Action.slice(1);
+		
+		return Reply;
+	}
+
 	
 	CreateCamera(Game,RenderView)
 	{
