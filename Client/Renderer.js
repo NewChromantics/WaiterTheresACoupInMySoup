@@ -2,7 +2,7 @@ import Camera_t from './PopEngine/Camera.js'
 import {Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationMatrix,CreateTranslationScaleMatrix} from './PopEngine/Math.js'
 import AssetManager from './PopEngine/AssetManager.js'
 import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
-import {CoordToXy} from './Map.js'
+import {CoordToXy} from '../Server/Map.js'
 import {CreatePromise} from './PopEngine/PopWebApiCore.js'
 
 const ClearColour = [0,0,0];
