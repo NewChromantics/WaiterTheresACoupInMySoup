@@ -1,5 +1,5 @@
 import Camera_t from './PopEngine/Camera.js'
-import {Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationMatrix,CreateTranslationScaleMatrix} from './PopEngine/Math.js'
+import {GetPlaneIntersection,Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationMatrix,CreateTranslationScaleMatrix} from './PopEngine/Math.js'
 import AssetManager from './PopEngine/AssetManager.js'
 import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
 import {CoordToXy} from './TileMap.js'
@@ -67,6 +67,7 @@ export default class Renderer
 	CreateCamera(Game,RenderView)
 	{
 		const Camera = new Camera_t();
+		Camera.FovVertical = 60;
 
 		//	position camera looking at center of map
 		//	and far enough out to see it all
@@ -143,6 +144,13 @@ export default class Renderer
 		const x = -xy[0];
 		const z = xy[1];
 		return [x,y,z];
+	}
+	
+	WorldToMapPosition(xyz)
+	{
+		const x = -xyz[0];
+		const y = xyz[2];
+		return [x,y];
 	}
 	
 	GetCubeRenderCommand(PushCommand,RenderContext,Position,Scale3,GeoAsset,Uniforms)
@@ -222,13 +230,35 @@ export default class Renderer
 	
 	WorldRayToSceneHit(Ray)
 	{
-		return {};
+		const WorldZero = this.MapPositionToWorldPosition([0,0]);
+		const FloorY = WorldZero[1];
+		const WorldUp = [0,1,0];
+		const Plane = [...WorldUp,FloorY];
+		const Intersection = GetPlaneIntersection( Ray.Start, Ray.Direction, Plane );
+		if ( !Intersection )
+			return null;
+		
+		//	todo: hit verticals
+		//	todo: hit actors
+		//	get tile at position (null means we missed)
+		const Hit = {};
+		Hit.xy = this.WorldToMapPosition(Intersection);
+		Hit.Tile = this.Game.Map.GetTileAt( ...Hit.xy );
+		if ( Hit.Tile )
+		{
+		}
+		
+		return Hit;
 	}
 	
 	PopInputs()
 	{
+		function ValidHit(Hit)
+		{
+			return Hit != null;
+		}
 		//	get all queued up inputs as rays, and where they intersect the scene
-		const SceneHits = this.QueuedInputRays.map( this.WorldRayToSceneHit.bind(this) );
+		const SceneHits = this.QueuedInputRays.map( this.WorldRayToSceneHit.bind(this) ).filter(ValidHit);
 		this.QueuedInputRays = [];
 		return SceneHits;
 	}

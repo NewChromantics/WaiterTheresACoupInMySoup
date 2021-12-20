@@ -18,13 +18,8 @@ export default class GameClient
 		this.Map = new TileMap_t( PremadeMapWidth, PremadeMapHeight, GetCellAttributes );
 		this.Scene = new SceneManager_t( this.Map );
 
-		this.Scene.AllocateActorInSpace('Player1','1');
-		this.Scene.AllocateActorInSpace('Player2','2');
-		this.Scene.AllocateActorInSpace('Player3','3');
-		this.Scene.AllocateActorInSpace('Player4','4');
-		this.Scene.AllocateActorInSpace('Player5','5');
-		this.Scene.AllocateActorInSpace('Player6','6');
-
+		for ( let i=1;	i<10;	i++ )
+			this.Scene.AllocateActorInSpace(`Player${i}`,`${i}`);
 
 		this.Room = new ServerRoom();
 		this.Server = new GameServer(this.Room);
@@ -123,12 +118,12 @@ export default class GameClient
 			//	get an unobscured path to this tile pos from our location
 			const PlayerActor = this.Scene.GetActor(this.PlayerActorName);
 			const Start = PlayerActor.xy;
-			const End = SceneHit.Tile.xy;
+			const End = SceneHit.xy;
 			function IsObscured(x,y)	{	return false;	}	//	todo: check actor isn't in the way - do we want to recalc this though?
-			const Path = this.TileMap.GetPath( Start, End );
+			const Path = this.Map.GetPath( Start, End );
 			//	failed to get a route... tell path to be the end and it'll reclaculate
 			if ( !Path )
-				Path = [End];
+				Path = [End.slice()];
 			PlayerActor.AutoPath = Path;
 		}
 		else
@@ -146,12 +141,18 @@ export default class GameClient
 			{
 				//	walk path
 				const NextPos = Actor.AutoPath.shift();
-				Actor.xy = NextPos.slice();
-				if ( Actor.AutoPath.length==0 )
-					Actor.AutoPath = null;
+				if ( NextPos )
+				{
+					Actor.xy = NextPos.slice();
+					Actor.xy[0] *= this.Map.TileSize;
+					Actor.xy[1] *= this.Map.TileSize;
+				
+					if ( Actor.AutoPath.length==0 )
+						Actor.AutoPath = null;
+				}
 			}
 		}
-		this.Scene.ForEachActor(UpdateActor);
+		this.Scene.ForEachActor( UpdateActor.bind(this) );
 	}
 	
 	async UpdateThread(RenderView)
@@ -169,7 +170,7 @@ export default class GameClient
 			this.UpdateActors();
 			
 			//	wait for next tick
-			await Pop.Yield( 1000/60 );
+			await Pop.Yield( 1000/15 );
 		}
 		
 	}

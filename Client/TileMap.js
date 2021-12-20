@@ -95,7 +95,7 @@ export default class TileMap
 		return Sprites;
 	}
 	
-	GetEmptyCells()
+	GetEmptyTiles()
 	{
 		const EmptyPositions = [];
 		
@@ -108,6 +108,50 @@ export default class TileMap
 			EmptyPositions.push(xy);
 		}
 		return EmptyPositions;
+	}
+	
+	GetTileAt(x,y,TileCoord=false)
+	{
+		if ( !TileCoord )
+		{
+			x = Math.round( x / this.TileSize );
+			y = Math.round( y / this.TileSize );
+		}
+		const Coord = XyToCoord(x,y);
+		const Tile = this.Cells[Coord];
+		return Tile;
+	}
+	
+	GetPath(Start,End)
+	{
+		let Pos = Start.slice();
+		//	floor just in case
+		let Deltax = Math.floor( End[0] - Start[0] );	
+		let Deltay = Math.floor( End[1] - Start[1] );
+		
+		const Path = [];
+		Path.push(Pos.slice());
+		
+		let Safety = 999;
+		while ( (Deltax != 0 || Deltay != 0) && Safety-->0 )
+		{
+			let Movex = 0;
+			let Movey = 0;
+			
+			if ( Math.abs(Deltax) > Math.abs(Deltay) )
+				Movex = (Deltax > 0) ? 1 : -1;
+			else
+				Movey = (Deltay > 0) ? 1 : -1;
+			
+			Pos[0] += Movex;
+			Pos[1] += Movey;
+			Deltax -= Movex;
+			Deltay -= Movey;
+			
+			Path.push(Pos.slice());
+		}
+		
+		return Path;
 	}
 }
 

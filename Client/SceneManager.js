@@ -57,7 +57,7 @@ export default class SceneManager_t
 			return !HasActorInPosition(xy);
 		}
 		
-		let EmptyCells = this.Map.GetEmptyCells();
+		let EmptyCells = this.Map.GetEmptyTiles();
 		EmptyCells = EmptyCells.filter( HasNoActorInPosition );
 		return EmptyCells;
 	}
@@ -89,4 +89,10 @@ export default class SceneManager_t
 			Callback( Actor, ActorName );
 		}
 	}
+	
+	GetActor(Name)
+	{
+		return this.Actors[Name];
+	}
+	
 }
