@@ -2,7 +2,7 @@ import Pop from './PopEngine/PopEngine.js'
 import Renderer from './Renderer.js'
 import PromiseQueue from './PopEngine/PromiseQueue.js'
 import {GetArrayRandomElement} from './PopEngine/PopApi.js'
-import {PremadeMap} from './JaccuseMap.js'
+import {PremadeMapWidth,PremadeMapHeight,GetCellAttributes} from './JaccuseMap.js'
 import TileMap_t from './TileMap.js'
 import SceneManager_t from './SceneManager.js'
 
@@ -15,8 +15,16 @@ export default class GameClient
 	{
 		this.GameMessageQueue = new PromiseQueue(`GameMessageQueue`);
 	
-		this.Map = new TileMap_t( PremadeMap );
+		this.Map = new TileMap_t( PremadeMapWidth, PremadeMapHeight, GetCellAttributes );
 		this.Scene = new SceneManager_t( this.Map );
+
+		this.Scene.AllocateActorInSpace('Player1','1');
+		this.Scene.AllocateActorInSpace('Player2','2');
+		this.Scene.AllocateActorInSpace('Player3','3');
+		this.Scene.AllocateActorInSpace('Player4','4');
+		this.Scene.AllocateActorInSpace('Player5','5');
+		this.Scene.AllocateActorInSpace('Player6','6');
+
 
 		this.Room = new ServerRoom();
 		this.Server = new GameServer(this.Room);
@@ -27,6 +35,7 @@ export default class GameClient
 
 		//	run
 		this.OnGameEndPromise = this.GameThread(RenderView);
+		this.UpdateThread();
 		const OnError = this.OnError.bind(this);
 		this.RenderThread(RenderContext).then(OnError).catch(OnError);
 	}
@@ -99,6 +108,70 @@ export default class GameClient
 	{
 		const Reply = await this.Renderer.WaitForMoveSelection(Message.Move.Actions);
 		return Reply;
+	}
+	
+	get PlayerActorName()
+	{
+		return 'Player1';
+	}
+	
+	ProcessInput(SceneHit)
+	{
+		//	todo: let user draw a path with a drag
+		if ( SceneHit.Tile )
+		{
+			//	get an unobscured path to this tile pos from our location
+			const PlayerActor = this.Scene.GetActor(this.PlayerActorName);
+			const Start = PlayerActor.xy;
+			const End = SceneHit.Tile.xy;
+			function IsObscured(x,y)	{	return false;	}	//	todo: check actor isn't in the way - do we want to recalc this though?
+			const Path = this.TileMap.GetPath( Start, End );
+			//	failed to get a route... tell path to be the end and it'll reclaculate
+			if ( !Path )
+				Path = [End];
+			PlayerActor.AutoPath = Path;
+		}
+		else
+		{
+			Pop.Debug(`Process non-tile input`,SceneHit);
+		}
+	}
+	
+	UpdateActors()
+	{
+		//	move any actors who have a path
+		function UpdateActor(Actor,ActorName)
+		{
+			if ( Actor.AutoPath )
+			{
+				//	walk path
+				const NextPos = Actor.AutoPath.shift();
+				Actor.xy = NextPos.slice();
+				if ( Actor.AutoPath.length==0 )
+					Actor.AutoPath = null;
+			}
+		}
+		this.Scene.ForEachActor(UpdateActor);
+	}
+	
+	async UpdateThread(RenderView)
+	{
+		await this.OnInitialStatePromise;
+		
+		//	
+		while ( true )
+		{
+			//	process all inputs
+			const SceneHits = this.Renderer.PopInputs();
+			SceneHits.forEach( this.ProcessInput.bind(this) );
+
+			//	move all actors
+			this.UpdateActors();
+			
+			//	wait for next tick
+			await Pop.Yield( 1000/60 );
+		}
+		
 	}
 	
 	async GameThread(RenderView)

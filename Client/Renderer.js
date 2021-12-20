@@ -5,9 +5,12 @@ import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
 import {CoordToXy} from './TileMap.js'
 import {CreatePromise} from './PopEngine/PopWebApiCore.js'
 import SpriteManager_t from './SpriteManager.js'
+import Pop from './PopEngine/PopEngine.js'
 
 const ClearColour = [0,0,0];
 
+//	todo: need bigger tolerance for phones?
+const MinimumDragPx = 10;
 
 
 async function CreateCube01TriangleBuffer(RenderContext)
@@ -33,6 +36,8 @@ export default class Renderer
 		const MapCubeGeoAttribs = ['LocalPosition','LocalUv'];	//	need to remove the need for this!
 		this.CubeGeo = AssetManager.RegisterAssetAsyncFetchFunction('Cube01', CreateCube01TriangleBuffer);
 		this.MapCubeShader = AssetManager.RegisterShaderAssetFilename(MapCubeFrag_Filename,MapCubeVert_Filename,null,MapCubeGeoAttribs);
+		
+		this.QueuedInputRays = [];
 	}
 	
 	async WaitForMoveSelection(Actions)
@@ -65,7 +70,7 @@ export default class Renderer
 
 		//	position camera looking at center of map
 		//	and far enough out to see it all
-		const MapMinMax = Game.Map.GetMinMax();
+		const MapMinMax = Game.Map.GetMinMax(true);
 		MapMinMax.Min = this.MapPositionToWorldPosition( MapMinMax.Min );
 		MapMinMax.Max = this.MapPositionToWorldPosition( MapMinMax.Max );
 		Camera.LookAt = Lerp3( MapMinMax.Min, MapMinMax.Max, 0.5 );
@@ -80,8 +85,15 @@ export default class Renderer
 		//		in ... another project so this may change later
 		function MoveCamera (x, y, Button, FirstDown) 
 		{
-			if (Button == 'Left')	Camera.OnCameraOrbit(x, y, 0, FirstDown);
-			if (Button == 'Right')	Camera.OnCameraPanLocal(-x, y, 0, FirstDown);
+			//	return true to capture input
+			if (Button == 'Left')	
+			{
+				Camera.OnCameraOrbit(x, y, 0, FirstDown);
+			}
+			if (Button == 'Right')	
+			{
+				Camera.OnCameraPanLocal(-x, y, 0, FirstDown);
+			}
 		}
 		const Window = RenderView;
 		Window.OnMouseDown = function(x,y,Button)
@@ -92,6 +104,21 @@ export default class Renderer
 		Window.OnMouseMove = function(x,y,Button)
 		{
 			MoveCamera( x,y,Button,false );
+		}
+		
+		const OnSceneClick = this.OnSceneClick.bind(this);
+		Window.OnMouseUp = function(x,y,Button)
+		{
+			if ( Button == 'Left' )
+			{
+				//	check if we moved the mouse enough to count as a drag
+				//	gr: note order is changed in camera, shouldn't use those internal vars
+				const Deltax = Math.abs( Camera.Last_OrbitPos[0] - y );
+				const Deltay = Math.abs( Camera.Last_OrbitPos[1] - x );
+				const Delta = Math.max( Deltax, Deltay );
+				if ( Delta < MinimumDragPx )
+					OnSceneClick( x, y, Window.GetScreenRect() );
+			}
 		}
 
 		Window.OnMouseScroll = function(x,y,Button,Delta)
@@ -158,7 +185,10 @@ export default class Renderer
 		//	render characters
 		const ActorSprites = this.Game.Scene.GetSprites();
 
-		const Sprites = TileMapSprites.concat( ActorSprites );
+		const Sprites = [];
+		Sprites.push( ...ActorSprites );
+		Sprites.push( ...TileMapSprites );
+
 		for ( let Sprite of Sprites )
 		{
 			this.GetSpriteRenderCommands( Sprite, CameraUniforms, PushCommand, RenderContext );
@@ -178,5 +208,28 @@ export default class Renderer
 		this.GetSceneRenderCommands( PushCommand, RenderContext );
 		
 		return Commands;
+	}
+	
+	OnSceneClick(x,y,ScreenRect)
+	{
+		const u = x / ScreenRect[2];
+		const v = y / ScreenRect[3];
+		//	gr: should this be passing in viewport, in case that's different?
+		const Ray = this.Camera.GetScreenRay( u, v, ScreenRect );
+		Pop.Debug(`SceneClick`,Ray);
+		this.QueuedInputRays.push( Ray );
+	}
+	
+	WorldRayToSceneHit(Ray)
+	{
+		return {};
+	}
+	
+	PopInputs()
+	{
+		//	get all queued up inputs as rays, and where they intersect the scene
+		const SceneHits = this.QueuedInputRays.map( this.WorldRayToSceneHit.bind(this) );
+		this.QueuedInputRays = [];
+		return SceneHits;
 	}
 };

@@ -36,30 +36,28 @@ export function CoordToXy(Coord)
 //		maybe this can be the state, so use dumb data
 export default class TileMap
 {
-	constructor(PremadeMap,TileSize=1)
+	constructor(MapWidth,MapHeight,GetCellAttributes,TileSize=1)
 	{
 		//	todo: layers. Currently everything is flat, no height, only at render time
 		//		this TileMap class will want to access sprite manager to get heights of tiles (for collision)
 		//		we also want an external thing for cell occupation... (same thing?)
-		function CreateCell(x,y)
-		{
-			const Cell = PremadeMap[y][x];
-			if ( Cell == ' ' )
-				return null;
-			return Cell;
-		}
-		this.Cells = GenerateCellMap( CreateCell, PremadeMap[0].length, PremadeMap.length );
+		this.Cells = GenerateCellMap( GetCellAttributes, MapWidth, MapHeight );
 		this.TileSize = TileSize;
 	}
 	
 	//	return .Min=[x,y] and .Max of furthest cell coords
-	GetMinMax()
+	GetMinMax(ScaleToTileSize=false)
 	{
 		let Min = null;
 		let Max = null;
+		let xscale = ScaleToTileSize ? this.TileSize : 1;
+		let yscale = ScaleToTileSize ? this.TileSize : 1;
+		
 		for ( let Coord in this.Cells )
 		{
 			const xy = CoordToXy(Coord);
+			xy[0] *= xscale;
+			xy[1] *= yscale;
 			
 			if ( !Min )
 				Min = xy.slice();
@@ -87,7 +85,7 @@ export default class TileMap
 			Sprite.y = xy[1] * this.TileSize;
 			Sprite.w = this.TileSize;	//	these should be from/dictated by sprite asset manager in the renderer, not here?
 			Sprite.h = this.TileSize;	//	these should be from/dictated by sprite asset manager in the renderer, not here?
-			Sprite.Sprite = Cell;
+			Sprite.Sprite = Cell.Type;
 			
 			return Sprite;
 		}
@@ -95,6 +93,21 @@ export default class TileMap
 		const Sprites = Object.keys( this.Cells ).map( CellToSprite.bind(this) );
 		
 		return Sprites;
+	}
+	
+	GetEmptyCells()
+	{
+		const EmptyPositions = [];
+		
+		for ( let Coord in this.Cells )
+		{
+			const Cell = this.Cells[Coord];
+			if ( Cell.Obstructed )
+				continue;
+			const xy = CoordToXy(Coord);
+			EmptyPositions.push(xy);
+		}
+		return EmptyPositions;
 	}
 }
 

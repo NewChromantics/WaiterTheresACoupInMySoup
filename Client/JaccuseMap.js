@@ -17,3 +17,36 @@ export const PremadeMap =
 ];
 
 
+export const PremadeMapWidth = PremadeMap[0].length;
+export const PremadeMapHeight = PremadeMap.length;
+
+function IsFloor(Cell)
+{
+	switch(Cell)
+	{
+		case '_':
+		case '.':
+			return true;
+			
+		default:
+			return false;
+	}
+}
+
+//	gr: this is supposed to be abstract from the sprite (see sprite manager)
+//		but... is there much point?
+export function GetCellAttributes(x,y)
+{
+	const Row = PremadeMap[y];
+
+	const Cell = {};
+	Cell.Type = Row ? Row[x] : null;
+	if ( !Cell.Type )
+		return;
+	if ( Cell.Type == ' ' )
+		return;
+	
+	Cell.Obstructed = !IsFloor(Cell.Type);
+	return Cell;
+}
+
