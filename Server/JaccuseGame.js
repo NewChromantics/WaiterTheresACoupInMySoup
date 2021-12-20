@@ -1,5 +1,4 @@
 import Pop from '../Client/PopEngine/PopEngine.js'
-import {MapState_t,PremadeMap} from './Map.js'
 import PromiseQueue from '../Client/PopEngine/PromiseQueue.js'
 import {GetArrayRandomElement} from '../Client/PopEngine/PopApi.js'
 
@@ -117,7 +116,6 @@ export class GameServer
 	CreateInitialState()
 	{
 		const State = {};
-		State.Map = new MapState_t( PremadeMap );
 
 		//	there are N players, each has a placecard, and will have a meal placed at their placecard
 		//	todo: king's soup (has no placecard)

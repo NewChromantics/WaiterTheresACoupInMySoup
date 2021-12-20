@@ -2,8 +2,9 @@ import Camera_t from './PopEngine/Camera.js'
 import {Distance3,Lerp3,MatrixInverse4x4,CreateIdentityMatrix,CreateTranslationMatrix,CreateTranslationScaleMatrix} from './PopEngine/Math.js'
 import AssetManager from './PopEngine/AssetManager.js'
 import {CreateCubeGeometry} from './PopEngine/CommonGeometry.js'
-import {CoordToXy} from '../Server/Map.js'
+import {CoordToXy} from './TileMap.js'
 import {CreatePromise} from './PopEngine/PopWebApiCore.js'
+import SpriteManager_t from './SpriteManager.js'
 
 const ClearColour = [0,0,0];
 
@@ -27,6 +28,7 @@ export default class Renderer
 	{
 		this.Game = Game;
 		this.Camera = this.CreateCamera(Game,RenderView);
+		this.SpriteManager = new SpriteManager_t();
 
 		const MapCubeGeoAttribs = ['LocalPosition','LocalUv'];	//	need to remove the need for this!
 		this.CubeGeo = AssetManager.RegisterAssetAsyncFetchFunction('Cube01', CreateCube01TriangleBuffer);
@@ -116,11 +118,8 @@ export default class Renderer
 		return [x,y,z];
 	}
 	
-	GetCubeRenderCommand(PushCommand,RenderContext,Position,CameraUniforms,GeoAsset,Colour,Scale3=[1,1,1])
+	GetCubeRenderCommand(PushCommand,RenderContext,Position,Scale3,GeoAsset,Uniforms)
 	{
-		const Uniforms = Object.assign( {}, CameraUniforms );
-		
-		Uniforms.Colour = Colour;
 		Uniforms.LocalToWorldTransform = CreateTranslationScaleMatrix( Position, Scale3 );
 		
 		const Geo = AssetManager.GetAsset(GeoAsset,RenderContext);
@@ -129,16 +128,17 @@ export default class Renderer
 		PushCommand('Draw',Geo,Shader,Uniforms);
 	}
 
-	GetCellRenderCommands(Cell,Coord,CameraUniforms,PushCommand,RenderContext)
+	GetSpriteRenderCommands(Sprite,CameraUniforms,PushCommand,RenderContext)
 	{
-		const Colour = Cell.Colour;
-		const ScaleY = Cell.Height;
 		const GeoAsset = this.CubeGeo;
-				
-		const Coordxy = CoordToXy( Coord );
-		const Position = this.MapPositionToWorldPosition( Coordxy );
 
-		this.GetCubeRenderCommand( PushCommand, RenderContext, Position, CameraUniforms, GeoAsset, Colour, [1,ScaleY,1] );
+		const Uniforms = this.SpriteManager.GetUniforms( Sprite );
+		Object.assign( Uniforms, CameraUniforms );
+		
+		const Position = this.MapPositionToWorldPosition( [Sprite.x,Sprite.y] );
+		const Scale3 = [Sprite.w,Uniforms.ScaleY,Sprite.h];
+
+		this.GetCubeRenderCommand( PushCommand, RenderContext, Position, Scale3, GeoAsset, Uniforms );
 	}
 
 	GetSceneRenderCommands(PushCommand,RenderContext)
@@ -154,15 +154,16 @@ export default class Renderer
 		CameraUniforms.CameraToWorldTransform = MatrixInverse4x4( CameraUniforms.WorldToCameraTransform );
 
 		//	render cells of map
+		const TileMapSprites = this.Game.Map.GetSprites();
 		//	render characters
-		//	render laser pointer
-		for ( let Coord in this.Game.Map.Cells )
+		const ActorSprites = this.Game.Scene.GetSprites();
+
+		const Sprites = TileMapSprites.concat( ActorSprites );
+		for ( let Sprite of Sprites )
 		{
-			const Cell = this.Game.Map.Cells[Coord];
-			if ( !Cell )
-				continue;
-			this.GetCellRenderCommands( Cell, Coord, CameraUniforms, PushCommand, RenderContext );
+			this.GetSpriteRenderCommands( Sprite, CameraUniforms, PushCommand, RenderContext );
 		}
+		//	render laser pointer
 	}
 	
 	async GetRenderCommands(RenderContext,Game)

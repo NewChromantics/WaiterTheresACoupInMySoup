@@ -2,6 +2,9 @@ import Pop from './PopEngine/PopEngine.js'
 import Renderer from './Renderer.js'
 import PromiseQueue from './PopEngine/PromiseQueue.js'
 import {GetArrayRandomElement} from './PopEngine/PopApi.js'
+import {PremadeMap} from './JaccuseMap.js'
+import TileMap_t from './TileMap.js'
+import SceneManager_t from './SceneManager.js'
 
 import {ServerRoom,GameServer} from '../Server/JaccuseGame.js'
 
@@ -12,6 +15,9 @@ export default class GameClient
 	{
 		this.GameMessageQueue = new PromiseQueue(`GameMessageQueue`);
 	
+		this.Map = new TileMap_t( PremadeMap );
+		this.Scene = new SceneManager_t( this.Map );
+
 		this.Room = new ServerRoom();
 		this.Server = new GameServer(this.Room);
 		this.Room.AddPlayer('Player1', this.OnServerMessage.bind(this) );
@@ -23,11 +29,6 @@ export default class GameClient
 		this.OnGameEndPromise = this.GameThread(RenderView);
 		const OnError = this.OnError.bind(this);
 		this.RenderThread(RenderContext).then(OnError).catch(OnError);
-	}
-	
-	get Map()
-	{
-		return this.State.Map;
 	}
 	
 	OnNewState(NewState)
